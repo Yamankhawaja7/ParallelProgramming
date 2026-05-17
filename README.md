@@ -1,96 +1,126 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+#  المحرك الخلفي المتوازي وعالي الأداء لمنصة التجارة الإلكترونية 
+### Laravel 12 High-Concurrency & Parallel E-Commerce Backend Engine
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+مرحباً بك في المستودع البرمجي للمحرك الخلفي لمنصة التجارة الإلكترونية المتوازية. تم تصميم وبناء هذا النظام بأحدث التقنيات البرمجية لتلبية **المتطلبات العشرة لنظم الحوسبة المتوازية والموزعة (Parallel & Distributed Systems)**، مع التركيز على ضمان سلامة البيانات تحت أحمال الضغط العالية وتفادي مشاكل التزامن الشائعة مثل الـ Race Conditions والـ Deadlocks.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🏛️ البنية المعمارية للنظام (System Architecture)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+يعتمد النظام على معمارية موزعة ومقاومة للانهيار (Fault-Tolerant & High-Availability Architecture) تتكون من المكونات التالية:
+1. **خوادم متعددة (4-Port Cluster Setup):** لمحاكاة بيئة الخوادم المتعددة وتجاوز قيود نظام Windows في الـ Multithreading المباشر، يتم توزيع الأحمال على 4 خوادم تعمل بالتوازي على المنافذ `8000` و `8001` و `8002` و `8003`.
+2. **تجميع الاتصالات بقاعدة البيانات (Connection Pooling):** مدمج عبر تفعيل الاتصالات المستمرة (`Persistent Connections`) لتقليل استهلاك الموارد الناتجة عن إنشاء اتصالات متكررة بقاعدة البيانات.
+3. **تخزين مؤقت ومصفوفة مهام موزعة (Distributed Redis Cache & Queue):** يُسخدم Redis كـ Data Store أساسي للـ Caching وإدارة الطوابير المتزامنة لضمان تشغيل المهام الثقيلة بشكل غير حاصِر (Non-Blocking).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 📊 تغطية المتطلبات العشرة للنظم المتوازية (The 10 Core Requirements)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+تمت برمجة وتغطية جميع المتطلبات الأكاديمية بنسبة **100%** في هذا المشروع، وهي كالتالي:
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+| # | المتطلب البرمجي | طريقة المعالجة والحل في الكود | الملف المسؤول في المشروع | مسار الاختبار والتحقق |
+|---|---|---|---|---|
+| **1** | **تجنب الـ Race Condition** | قمنا ببرمجة مسار غير آمن لإثبات نزول المخزون تحت الصفر، ومسار آمن يمنع ذلك تماماً. | `InventoryService.php` | `POST /api/inventory/unsafe-decrease` vs `safe-decrease` |
+| **2** | **إدارة الموارد والسعة (Capacity Control)** | تشغيل تجميع الاتصالات وتوزيع الحمل على 4 خوادم متوازية لحماية الخادم من الانهيار. | `database.php` & `start-cluster.bat` | اختبار الضغط المباشر على المنافذ الأربعة معاً |
+| **3** | **الطوابير اللاتزامنية (Async Queues)** | نقل مهام معالجة الفواتير الثقيلة وإرسال الإشعارات إلى الخلفية عبر Redis Queues. | `SendInvoiceJob.php` & `SendNotificationJob.php` | `GET /api/test/email-sync` vs `email-async` |
+| **4** | **المعالجة على دفعات (Batch Processing)** | تجريد التقارير اليومية الضخمة وتقسيم المعالجة إلى مجموعات ثابتة الحجم (`chunk(500)`) لحماية الذاكرة. | `DailySalesReportJob.php` | `GET /api/test/batch-unsafe` vs `batch-safe` |
+| **5** | **توزيع الأحمال (Load Distribution)** | محاكاة خوارزمية (Weighted Round-Robin) لتوزيع المهام على الخوادم بناءً على وزن وقدرة كل خادم. | `LoadBalancerService.php` | `POST /api/lb/dispatch` & `/api/lb/simulate` |
+| **6** | **التخزين المؤقت الموزع (Redis Caching)** | استخدام Redis Cache لتخزين قائمة المنتجات والمنتجات الأكثر طلباً وتجنب استعلامات SQL المعقدة. | `ProductCacheService.php` | `GET /api/test/products-db` vs `products-cache` |
+| **7** | **الـ Locking (Pessimistic vs Optimistic)** | برمجة قفل البيانات المتشائم (`FOR UPDATE`) وقفل البيانات المتفائل المعتمد على حقل الـ `version` المدمج. | `InventoryService.php` & `InventoryRepository.php` | `POST /api/inventory/safe-decrease` vs `optimistic-decrease` |
+| **8** | **تكامل المعاملات (ACID Integrity)** | إحاطة عمليات الشراء وإنشاء الطلبات وحركات الدفع بـ `DB::transaction` لضمان مبدأ (All-or-Nothing). | `InventoryService.php` | `POST /api/orders` (أي فشل في أي جدول يلغي المعاملة كاملة) |
+| **9** | **اختبار الضغط المتزامن (Stress Testing)** | توفير سيناريوهات K6 جاهزة لمحاكاة 100 مستخدم متزامن دون أي تدمير للبيانات أو حدوث سالب. | `test-all-scenarios.js` | تشغيل أداة K6 أو خطط JMeter المدمجة في المشروع |
+| **10** | **قياس الأداء وتحليل الاختناقات (AOP)** | برمجة Middleware يقوم بالاعتراض وقياس استهلاك الرام، عدد الاستعلامات، وتحديد الاختناقات تلقائياً. | `PerformanceMonitorMiddleware.php` | `GET /api/benchmark/summary` & `/api/benchmark/compare` |
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+---
 
-## Agentic Development
+## 🛠️ متطلبات التشغيل والتهيئة (Installation & Setup)
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+للوقوف على تشغيل المشروع بكفاءة عالية على جهازك المحلي، اتبع الخطوات التالية:
 
+### 1. تثبيت الحزم البرمجية
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 2. إعداد بيئة العمل وقاعدة البيانات
+قم بإنشاء قاعدة بيانات فارغة في MySQL باسم `parallel_db` (أو كما ترغب)، ثم انسخ ملف `.env.example` إلى `.env` واضبط إعدادات الاتصال:
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-## Contributing
+### 3. تشغيل الحاويات (Containers) لـ Redis
+النظام يتطلب خادم Redis للعمل كقناة للتخزين المؤقت والطوابير. قم بتشغيله بضغطة زر واحدة عبر Docker:
+```bash
+docker-compose up -d redis
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-
----
-
-# Parallel E-Commerce System - Project Guide
-
-## Architecture Overview
-- جميع المكونات موضحة في ملفات docs/ (Queues, Caching, Batch Processing, Load Distribution, Benchmarking, Stress Testing)
-- نقاط التزامن موثقة في الكود عبر التعليقات (SYNC POINT)
-- كل نقطة Synchronization مشروحة في InventoryService وOrderController
-
-## AOP & Benchmarking
-- تم تطبيق PerformanceMonitorMiddleware لقياس زمن الاستجابة وعدد الاستعلامات
-- النتائج تعرض عبر `/api/benchmark/summary`
-
-## Developer Notes
-- استخدم Redis كـ Cache وQueue
-- جميع المهام الثقيلة تُنفذ في الخلفية (Jobs)
-- استخدم chunk() في أي معالجة بيانات ضخمة
-- راجع ملفات docs/ لكل متطلب عملي
-
-## How to Run
-1. شغل السيرفر بعدة Workers:
-   ```powershell
-   $env:PHP_CLI_SERVER_WORKERS=10; php artisan serve --no-reload
-   ```
-2. شغل Queue Worker:
-   ```powershell
-   php artisan queue:work
-   ```
-3. نفذ اختبار الضغط:
-   ```powershell
-   php artisan app:stress safe 100
-   ```
-4. راقب النتائج في قاعدة البيانات وملفات اللوج
+### 4. تنفيذ الهجرة وحقن البيانات التجريبية
+يقوم الـ Seeder بتهيئة قاعدة البيانات وإنشاء 110 مستخدمين جاهزين لاختبارات الضغط المتزامن، بالإضافة لتهيئة المنتجات الأساسية:
+```bash
+php artisan migrate:fresh --seed
+```
 
 ---
 
-لأي متطلب، راجع ملف docs/ المناسب أو اسأل عن أي نقطة غير واضحة.
+## 🚀 تشغيل الخوادم المتوازية (Running the 4-Port Cluster)
+
+لتشغيل محاكاة بيئة الخوادم الأربعة الموزعة بالتوازي، قمنا بتجهيز ملف باتش تنفيذي (`start-cluster.bat`).
+فقط قم بتشغيله من خلال النقر المزدوج عليه أو تشغيله عبر الـ Terminal:
+```bash
+.\start-cluster.bat
+```
+*سيقوم هذا السكربت بفتح 4 خوادم تعمل بالتوازي على المنافذ 8000-8003 لإحداث معالجة متوازية حقيقية.*
+
+**تشغيل طابور المهام في الخلفية (Queue Worker):**
+في نافذة Terminal منفصلة، قم بتشغيل مستمع الطوابير لمعالجة الفواتير والإشعارات اللاتزامنية:
+```bash
+php artisan queue:work --queue=invoices,notifications
+```
+
+---
+
+## 📊 كيفية إجراء الاختبارات ومقارنة الأداء (Running Tests & Benchmarks)
+
+لقد قمنا بتوفير عدة طرق لاختبار أداء النظام ومقارنته، لتناسب العرض الأكاديمي المباشر أمام الدكتور:
+
+### 🎯 أولاً: محاكي الأداء البرمجي المدمج (Programmatic Benchmark)
+هذا الأمر مذهل جداً، يقوم بإرسال طلبات محاكاة HTTP Kernel داخلية ويقيس استهلاك الرام، والوقت، وعدد الاستعلامات، ثم يعرض جدول مقارنة (Before vs After) يوضح نسبة التحسن الفوري!
+```bash
+php artisan system:benchmark
+```
+
+### 🧪 ثانياً: محاكاة الـ Race Condition محلياً
+يمكنك تشغيل هذا الأمر لإثبات حدوث الـ Race Condition وتحول المخزون إلى قيم سالبة في الحالة غير الآمنة، وكيف يتم حمايته كلياً في الحالة الآمنة:
+```bash
+# لإثبات الخلل (Race Condition) - ستلاحظ تعارض القيم في النهاية
+php artisan race:simulate --mode=unsafe --users=10
+
+# لإثبات فاعلية الحل (Pessimistic Locking) - مخزون سليم 100%
+php artisan race:simulate --mode=safe --users=10
+```
+
+### 📈 ثالثاً: اختبار الضغط الشامل عبر أداة K6
+إذا كانت أداة K6 مثبتة على جهازك، يمكنك تشغيل اختبار الضغط المتكامل الذي يقوم بمحاكاة 50 مستخدم متزامن يضربون الـ Cluster الأربعة بشكل عشوائي:
+```bash
+k6 run test-all-scenarios.js
+```
+
+### 🖥️ رابعاً: لوحة التحكم الويب (Interactive Web GUI)
+قم بزيارة المسار التالي في المتصفح لرؤية لوحة تحكم ويب تفاعلية تمكنك من تشغيل اختبارات الضغط ورؤية النتائج مباشرة:
+`http://127.0.0.1:8000/demo`
+
+---
+
+## 📈 استعراض الاختناقات ومقارنة الأداء (AOP Report Endpoints)
+
+جميع الطلبات التي تمر عبر النظام يتم فحصها بواسطة الـ Performance Monitor. يمكنك زيارة الروابط التالية عبر المتصفح أو Postman لاستخراج تقارير حية للدكتور:
+- **ملخص الأداء لجميع المسارات:** `http://127.0.0.1:8000/api/benchmark/summary`
+- **قائمة الاختناقات المكتشفة برمجياً (بطء، ذاكرة عالية، استعلامات متكررة):** `http://127.0.0.1:8000/api/benchmark/bottlenecks`
+- **مقارنة الأداء التلقائية قبل وبعد:** `http://127.0.0.1:8000/api/benchmark/compare?endpoint=/api/test/products-cache`
+
+---
+
+## 📜 رخصة المشروع
+هذا المشروع مفتوح المصدر وخاضع لرخصة **MIT License**. تم تطويره لغايات البحث العلمي والأكاديمي لإثبات كفاءة حلول التزامن في خوادم الويب المتطورة.
