@@ -122,5 +122,59 @@ k6 run test-all-scenarios.js
 
 ---
 
+## 📈 نتائج اختبارات الأداء والضغط المرئية (Visual Benchmarks)
+
+فيما يلي أدلة الأداء المرئية ومخططات التحقق التي تم التقاطها أثناء اختبارات الحمل والضغط لإثبات كفاءة النظام:
+
+### 🎯 1. حماية الـ Race Condition (اختبارات JMeter)
+* **قبل (المسار غير الآمن):** يوضح حدوث مشكلة Race Condition ونزول المخزون بالسالب بسبب معالجة الطلبات المتزامنة بدون استخدام أقفال.
+  ![Race Condition Unsafe](./screenshots/jmeter_race_condition_before.png)
+* **بعد (المسار الآمن):** سلامة تامة للبيانات بنسبة 100% باستخدام الأقفال المتشائمة/المتفائلة، مع حظر التراجع تحت الصفر.
+  ![Race Condition Safe](./screenshots/jmeter_race_condition_after.png)
+
+### ⚙️ 2. إدارة الموارد والسعة (تجميع الاتصالات Pooling)
+* **قبل التفعيل:** استهلاك عالٍ لمعالج النظام ونفاد للاتصالات مع محاولات فتح اتصالات جديدة لكل طلب.
+  ![Resource Management Before](./screenshots/resource_management_before.png)
+* **بعد التفعيل:** استقرار تام في عدد اتصالات قاعدة البيانات بفضل الاتصالات المستمرة (Persistent Connections).
+  ![Resource Management After](./screenshots/resource_management_after.png)
+
+### ⏳ 3. المعالجة اللاتزامنية مقابل التزامنية
+* **المعالجة التزامنية (Synchronous):** حظر خيط التنفيذ عند إرسال الفواتير مما يؤدي لتأخير استجابة المستخدم بشكل كبير.
+  ![Synchronous](./screenshots/sync.png)
+* **المعالجة اللاتزامنية (Asynchronous):** ترحيل المهام الثقيلة لخلفية النظام عبر Redis مما جعل الاستجابة فورية وفي أجزاء من الثانية.
+  ![Asynchronous](./screenshots/async.png)
+
+### 💾 4. إدارة ذاكرة معالجة الدفعات (Batch Processing)
+* **قبل (تحميل دفعة واحدة):** ارتفاع حاد وخطر في استهلاك الذاكرة (RAM) قد يؤدي لانهيار الخادم.
+  ![Batch Before](./screenshots/batch_processing_before.png)
+* **بعد (المعالجة على دفعات):** استقرار خط استهلاك الذاكرة بفضل استخدام تقنية الـ `chunk(500)`.
+  ![Batch After](./screenshots/batch_processing_after.png)
+
+### 🔄 5. توزيع الأحمال ومحاكاة انهيار الخوادم (Failover)
+* **توزيع متزن (Weighted Round-Robin):** محاكاة نجاح الموزع في توجيه الطلبات للخوادم الأربعة حسب وزن كل خادم.
+  ![Weighted Distribution](./screenshots/normal_weighted_distribution.png)
+* **سيناريو الانهيار (Failover):** محاكاة سقوط خادم وتوجيه الطلبات تلقائياً وبسلاسة إلى بقية الخوادم النشطة دون توقف.
+  ![Server Failover](./screenshots/server_failover.png)
+
+### ⚡ 6. التخزين المؤقت الموزع (Redis Caching)
+* **قبل الكاش:** استعلامات مباشرة ومتكررة لقاعدة البيانات مما يبطئ الاستجابة ويشكل ضغطاً على المحرك.
+  ![Caching Before](./screenshots/before_caching.png)
+* **بعد الكاش:** استجابة فورية بفضل Cache-Aside عبر Redis وتخفيف الضغط على قاعدة البيانات بنسبة هائلة.
+  ![Caching After](./screenshots/after_caching.png)
+
+### 🔒 7. آليات القفل (SQL Locking)
+* **قبل:** غياب الأقفال وسماح النظام بالتعديل المتزامن على نفس السطر.
+  ![SQL Lock Before](./screenshots/sql_locking_before.png)
+* **بعد:** تفعيل `SELECT ... FOR UPDATE` لإجبار بقية المعاملات على الانتظار حتى اكتمال المعاملة النشطة.
+  ![SQL Lock After](./screenshots/sql_locking_after.png)
+
+### 💥 8. اختبارات الضغط القصوى (Stress Testing)
+* **قبل:** انخفاض هائل في معدل معالجة الطلبات وارتفاع نسبة الأخطاء والطلبات الفاشلة تحت ضغط 100+ مستخدم.
+  ![Stress Test Before](./screenshots/stress_test_before.png)
+* **بعد:** ثبات الأداء وسرعة الاستجابة وصفر أخطاء تحت الضغط العالي بفضل استخدام معمارية النظام المتوازية.
+  ![Stress Test After](./screenshots/stress_test_after.png)
+
+---
+
 ## 📜 رخصة المشروع
 هذا المشروع مفتوح المصدر وخاضع لرخصة **MIT License**. تم تطويره لغايات البحث العلمي والأكاديمي لإثبات كفاءة حلول التزامن في خوادم الويب المتطورة.
